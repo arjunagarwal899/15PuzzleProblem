@@ -112,42 +112,35 @@ class State:
 file = '2017B3A70285G_ARJUN.dat'
 goal_states = [
 	(np.char.array([['0', '1', '2', '3'],
-	                ['*', '*', '*', '*'],
+	                ['4', '*', '*', '*'],
 	                ['*', '*', '*', '*'],
 	                ['*', '*', '*', '*']]),
-	 ('0', '1', '2', '3'),
+	 ('1', '2', '3', '4'),
 	 )
 	,
 	(np.char.array([['0', '*', '*', '*'],
-	                ['4', '5', '6', '*'],
-	                ['*', '*', '*', '*'],
+	                ['*', '5', '6', '7'],
+	                ['8', '*', '*', '*'],
 	                ['*', '*', '*', '*']]),
-	 ('0', '4', '5', '6'),
-	 )
-	,
-	(np.char.array([['0', '*', '*', '*'],
-	                ['*', '*', '*', '7'],
-	                ['8', '9', '*', '*'],
-	                ['*', '*', '*', '*']]),
-	 ('0', '7', '8', '9'),
+	 ('5', '6', '7', '8'),
 	 )
 	,
 	(np.char.array([['0', '*', '*', '*'],
 	                ['*', '*', '*', '*'],
-	                ['*', '*', 'A', 'B'],
+	                ['*', '9', 'A', 'B'],
 	                ['C', '*', '*', '*']]),
-	 ('0', 'A', 'B', 'C'),
+	 ('9', 'A', 'B', 'C'),
 	 )
 	,
 	(np.char.array([['0', '*', '*', '*'],
 	                ['*', '*', '*', '*'],
 	                ['*', '*', '*', '*'],
 	                ['*', 'D', 'E', 'F']]),
-	 ('0', 'D', 'E', 'F')
+	 ('D', 'E', 'F')
 	 )
 ]
 
-with open(file, 'ab+') as f:
+with open(file, 'wb') as f:
 	max_cost = 0
 	for goal_state in goal_states:
 		gs = State(goal_state[0])
@@ -158,13 +151,17 @@ with open(file, 'ab+') as f:
 		heappush(frontier, (0, gs))
 		exploring.add(gs)
 
-
+		existing_patterns = set([])
 		def loc_in_bytes(layout):
+			layout = layout.translate(''.maketrans('0', '*'))
+			if layout in existing_patterns:
+				return None
+			existing_patterns.add(layout)
+
 			list_locs = []
-			for i in range(0, 4):
-				for j in range(0, 4):
-					if layout[i, j] != '*':
-						list_locs.append((i, j))
+			for i in range(0, len(layout)):
+				if layout[i] != '*':
+					list_locs.append(i)
 
 			locs = []
 			for n in goal_state[1]:
@@ -174,43 +171,41 @@ with open(file, 'ab+') as f:
 
 			s = 0
 			for loc in locs:
-				i, j = loc
-				s <<= 2
-				s += i
-				s <<= 2
-				s += j
+				s <<= 4
+				s += loc
+
+			print('{:20}'.format(bin(s)), layout)
 
 			return s.to_bytes(2, byteorder='big', signed=False)
 
-		existing_locs = set()
+		nvshkvbs = 0
 		while frontier:
 			cost, node = heappop(frontier)
 			exploring.remove(node)
 
-			l = loc_in_bytes(node.layout)
-			if l in existing_locs:
-				print("mfjdsgnuignlfvg")
-			else:
-				existing_locs.add(l)
-			c = cost.to_bytes(1, byteorder='big', signed=False)
-			f.write(l + c)
+			layout = [list(a) for a in node.layout]
+			layout = ''.join(sum(layout, []))
+			l = loc_in_bytes(layout)
+			if l is not None:
+				c = cost.to_bytes(1, byteorder='big', signed=False)
+				f.write(l + c)
 
 			# print(l, c)
 
 			max_cost = max(max_cost, cost)
-			# print(len(frontier), cost)
+			# print(cost, '\t', len(frontier))
 
 			possible_next_states = node.get_possible_next_states()
 			for direction, possible_next_state in possible_next_states.items():
 				if possible_next_state not in explored and possible_next_state not in exploring:
 					new_cost = cost
-					if possible_next_state.layout[node.zero_location] != '*': new_cost += 1
+					if possible_next_state.layout[node.zero] != '*': new_cost += 1
 
 					heappush(frontier, (new_cost, possible_next_state))
 					exploring.add(possible_next_state)
 
 			explored.add(node)
-		if len(existing_locs) != 43680:
-			print("regyrsgs")
+			nvshkvbs += 1
+			# if nvshkvbs == 100: break
 
 print(max_cost)
