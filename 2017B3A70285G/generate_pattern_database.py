@@ -2,11 +2,13 @@ from heapq import *
 import numpy as np
 from enum import Enum
 
+
 class Moves(Enum):
 	UP = 'UP'
 	DOWN = 'DOWN'
 	LEFT = 'LEFT'
 	RIGHT = 'RIGHT'
+
 
 class State:
 	def __init__(self, arr, zero_location=None):
@@ -108,51 +110,67 @@ class State:
 
 
 file = '2017B3A70285G_ARJUN.dat'
-goal_states = np.array([
-	np.char.array([['0', '1', '2', '3'],
-	               ['*', '*', '*', '*'],
-	               ['*', '*', '*', '*'],
-		           ['*', '*', '*', '*']])
+goal_states = [
+	(np.char.array([['0', '1', '2', '3'],
+	                ['*', '*', '*', '*'],
+	                ['*', '*', '*', '*'],
+	                ['*', '*', '*', '*']]),
+	 ('0', '1', '2', '3'),
+	 )
 	,
-	np.char.array([['0', '*', '*', '*'],
-	               ['4', '5', '6', '*'],
-	               ['*', '*', '*', '*'],
-		           ['*', '*', '*', '*']])
+	(np.char.array([['0', '*', '*', '*'],
+	                ['4', '5', '6', '*'],
+	                ['*', '*', '*', '*'],
+	                ['*', '*', '*', '*']]),
+	 ('0', '4', '5', '6'),
+	 )
 	,
-	np.char.array([['0', '*', '*', '*'],
-	               ['*', '*', '*', '7'],
-	               ['8', '9', '*', '*'],
-		           ['*', '*', '*', '*']])
+	(np.char.array([['0', '*', '*', '*'],
+	                ['*', '*', '*', '7'],
+	                ['8', '9', '*', '*'],
+	                ['*', '*', '*', '*']]),
+	 ('0', '7', '8', '9'),
+	 )
 	,
-	np.char.array([['0', '*', '*', '*'],
-	               ['*', '*', '*', '*'],
-	               ['*', '*', 'A', 'B'],
-		           ['C', '*', '*', '*']])
+	(np.char.array([['0', '*', '*', '*'],
+	                ['*', '*', '*', '*'],
+	                ['*', '*', 'A', 'B'],
+	                ['C', '*', '*', '*']]),
+	 ('0', 'A', 'B', 'C'),
+	 )
 	,
-	np.char.array([['0', '*', '*', '*'],
-	               ['*', '*', '*', '*'],
-	               ['*', '*', '*', '*'],
-		           ['*', 'D', 'E', 'F']])
-	,
-])
+	(np.char.array([['0', '*', '*', '*'],
+	                ['*', '*', '*', '*'],
+	                ['*', '*', '*', '*'],
+	                ['*', 'D', 'E', 'F']]),
+	 ('0', 'D', 'E', 'F')
+	 )
+]
 
 with open(file, 'ab+') as f:
 	max_cost = 0
 	for goal_state in goal_states:
-		goal_state = State(goal_state)
+		gs = State(goal_state[0])
 
 		frontier = []
 		explored = set()
 		exploring = set()
-		heappush(frontier, (0, goal_state))
-		exploring.add(goal_state)
+		heappush(frontier, (0, gs))
+		exploring.add(gs)
+
 
 		def loc_in_bytes(layout):
-			locs = []
+			list_locs = []
 			for i in range(0, 4):
 				for j in range(0, 4):
 					if layout[i, j] != '*':
-						locs.append((i, j))
+						list_locs.append((i, j))
+
+			locs = []
+			for n in goal_state[1]:
+				for loc in list_locs:
+					if layout[loc] == n:
+						locs.append(loc)
 
 			s = 0
 			for loc in locs:
@@ -164,19 +182,23 @@ with open(file, 'ab+') as f:
 
 			return s.to_bytes(2, byteorder='big', signed=False)
 
-
+		existing_locs = set()
 		while frontier:
 			cost, node = heappop(frontier)
 			exploring.remove(node)
 
 			l = loc_in_bytes(node.layout)
+			if l in existing_locs:
+				print("mfjdsgnuignlfvg")
+			else:
+				existing_locs.add(l)
 			c = cost.to_bytes(1, byteorder='big', signed=False)
 			f.write(l + c)
 
 			# print(l, c)
 
 			max_cost = max(max_cost, cost)
-			print(len(frontier), cost)
+			# print(len(frontier), cost)
 
 			possible_next_states = node.get_possible_next_states()
 			for direction, possible_next_state in possible_next_states.items():
@@ -188,5 +210,7 @@ with open(file, 'ab+') as f:
 					exploring.add(possible_next_state)
 
 			explored.add(node)
+		if len(existing_locs) != 43680:
+			print("regyrsgs")
 
 print(max_cost)

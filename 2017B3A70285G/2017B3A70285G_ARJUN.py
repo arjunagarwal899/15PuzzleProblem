@@ -180,6 +180,7 @@ from enum import Enum  # Imported built-in "enum.Enum" class for declaring enume
 # 		node.left = leftRightGrandchild
 # 		if leftRightGrandchild is not None: leftRightGrandchild.parent = node
 
+heuristicTime = 0
 
 class _15Puzzle:
 	# An enumeration for storing the possible moves that can be made in the 15 Puzzle Problem
@@ -306,9 +307,9 @@ class _15Puzzle:
 		self.goal_state = _15Puzzle.State(goal_state)
 
 	def solve(self):
-		return self._a_star('MD')
+		return self._a_star()
 
-	def _a_star(self, heuristic='PD'):
+	def _a_star(self):
 		min_path = []
 		nodes_generated = 0
 
@@ -336,24 +337,56 @@ class _15Puzzle:
 
 			raise ValueError('Provided character is not a valid move')
 
+		heuristic_values = {}
+		database_elements = [
+			('0', '1', '2', '3'),
+			('0', '4', '5', '6'),
+			('0', '7', '8', '9'),
+			('0', 'A', 'B', 'C'),
+			('0', 'D', 'E', 'F')
+		]
+
+		with open('2017B3A70285G_ARJUN.dat', 'rb') as hfile:
+			data = hfile.read()
+			for i, database_element in enumerate(database_elements):
+				heuristic_values[database_element] = {}
+				for j in range(0, 43680):
+					start = 3 * (43680 * i + j)
+					locs = data[start: start + 2]
+					cost = data[start + 2]
+
+					a = ((locs[0] & 192) >> 6, (locs[0] & 48) >> 4)
+					b = ((locs[0] & 12) >> 2, (locs[0] & 3))
+					c = ((locs[1] & 192) >> 6, (locs[1] & 48) >> 4)
+					d = ((locs[1] & 12) >> 2, (locs[1] & 3))
+
+					heuristic_values[database_element][(a, b, c, d)] = cost
+
 		explored = set()
 		frontier = []
 
-		init_total_manhattan_distance = 0
-		for i in range(0, 4):
-			for j in range(0, 4):
-				n = self.init_state.layout[i, j]
-				if n != '0':
-					init_total_manhattan_distance += self._get_manhattan_distance(n, (i, j))
+		def get_cur_heuristic_value(layout):
+			global heuristicTime
+			startTime = time.time()
+			heuristic_value = 0
+			for i, database_element in enumerate(database_elements):
+				t = tuple()
+				for j in database_element:
+					t += (tuple(a[0] for a in np.where(layout == j)),)
 
-		heappush(frontier, (init_total_manhattan_distance, init_total_manhattan_distance, self.init_state, ''))
+				heuristic_value += heuristic_values[database_element][t]
+			heuristicTime += time.time() - startTime
+			return heuristic_value
 
-		while True:         # It is given that problem is solvable
-			cur_estimated_cost, cur_total_manhattan_distance, cur_state, cur_path = heappop(frontier)
+		init_heuristic_value = get_cur_heuristic_value(self.init_state.layout)
+		heappush(frontier, (init_heuristic_value, init_heuristic_value, self.init_state, ''))
 
-			# print(cur_estimated_cost, cur_estimated_cost - cur_total_manhattan_distance, cur_path)
+		while True:  # It is given that problem is solvable
+			cur_estimated_cost, cur_heuristic_value, cur_state, cur_path = heappop(frontier)
 
-			if cur_total_manhattan_distance == 0:
+			# print(cur_estimated_cost, cur_estimated_cost - cur_heuristic_value, cur_path)
+
+			if cur_state == self.goal_state:
 				for c in cur_path:
 					min_path.append(get_direction_from_char(c).value)
 				break
@@ -362,17 +395,17 @@ class _15Puzzle:
 			possible_next_states = cur_state.get_possible_next_states()
 			for direction, possible_next_state in possible_next_states.items():
 				if possible_next_state not in explored:
-					changed_tile = possible_next_state.layout[cur_state.zero_location]
-					new_total_manhattan_distance = cur_total_manhattan_distance - \
-					                               self._get_manhattan_distance(changed_tile, possible_next_state.zero_location) + \
-					                               self._get_manhattan_distance(changed_tile, cur_state.zero_location)
-					new_estimated_cost = cur_estimated_cost - cur_total_manhattan_distance + 1 + new_total_manhattan_distance
+					# changed_tile = possible_next_state.layout[cur_state.zero_location]
+
+					new_heuristic_value = get_cur_heuristic_value(possible_next_state.layout)
+
+					new_estimated_cost = cur_estimated_cost - cur_heuristic_value + 1 + new_heuristic_value
 
 					heappush(frontier, (
-								new_estimated_cost,
-								new_total_manhattan_distance,
-								possible_next_state,
-								cur_path + get_char_from_direction(direction))
+						new_estimated_cost,
+						new_heuristic_value,
+						possible_next_state,
+						cur_path + get_char_from_direction(direction))
 					         )
 
 					nodes_generated += 1
@@ -380,15 +413,15 @@ class _15Puzzle:
 		return min_path, nodes_generated
 
 
-	def _get_manhattan_distance(self, node_value, node_loc):
-		distance = 0
-
-		i, j = node_loc
-		x, y = (a[0] for a in np.where(self.goal_state.layout == node_value))
-
-		distance += abs(x - i) + abs(y - j)
-
-		return distance
+	# def _get_manhattan_distance(self, node_value, node_loc):
+	# 	distance = 0
+	#
+	# 	i, j = node_loc
+	# 	x, y = (a[0] for a in np.where(self.goal_state.layout == node_value))
+	#
+	# 	distance += abs(x - i) + abs(y - j)
+	#
+	# 	return distance
 
 
 def FindMinimumPath(initialState, goalState):
@@ -397,6 +430,7 @@ def FindMinimumPath(initialState, goalState):
 
 	puzzle = _15Puzzle(initialState, goalState)
 	minPath, nodesGenerated = puzzle.solve()
+	print(heuristicTime)
 
 	return minPath, nodesGenerated
 
@@ -407,7 +441,7 @@ def FindMinimumPath(initialState, goalState):
 
 def ReadInitialState():
 	# TODO: CHANGE BEFORE SUBMISSION
-	with open("test_state2.txt", "r") as file:  # IMP: If you change the file name, then there will be an error when
+	with open("test_state3.txt", "r") as file:  # IMP: If you change the file name, then there will be an error when
 		#               evaluators test your program. You will lose 2 marks.
 		initialState = [[x for x in line.split()] for i, line in enumerate(file) if i < 4]
 	return initialState
