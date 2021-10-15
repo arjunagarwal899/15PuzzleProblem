@@ -2,15 +2,13 @@
 import time
 from heapq import *  # See heapq_test.py file to learn how to use. Visit : https://docs.python.org/3/library/heapq.html
 
+from enum import Enum   # Imported built-in "enum.Enum" class for declaring enumerations
+
 ### Don't use fancy libraries. Evaluators won't install fancy libraries. You may use Numpy and Scipy if needed.
 ### Send an email to the instructor if you want to use more libraries.
 
 
 # ********************************************************************
-
-# Imported built-in "enum.Enum" class for declaring enumerations
-from enum import Enum
-
 
 # Main class which will allow creating objects for the 15 Puzzle Problem
 class Puzzle:
@@ -35,7 +33,7 @@ class Puzzle:
 			if isinstance(layout, list):
 				self.layout = bytearray(b''.join(bytes(a, encoding=Puzzle.encoding) for a in sum(layout, [])))
 
-			if zero_location is None: zero_location = self._find_zero()
+			if zero_location is None: zero_location = self.layout.find(b'0')
 			self.zero = zero_location
 
 		def __lt__(self, other):  # Overrides the "less than" operator as states cannot be compared
@@ -48,23 +46,21 @@ class Puzzle:
 			return hash(self.layout.hex())  # Hashed on the basis of the hex value of the layout
 
 		def __str__(self):  # Utility function. Prints the layout of the state
-			return self.layout
+			return str(bytes(self.layout))
 
-		def get_possible_moves(self):  # Returns all the moves which can be made from the current state as a set
-			possible_moves = set()
-			if self.zero < 12: possible_moves.add(Puzzle.Moves.UP)
-			if self.zero > 3: possible_moves.add(Puzzle.Moves.DOWN)
-			if self.zero % 4 != 3: possible_moves.add(Puzzle.Moves.LEFT)
-			if self.zero % 4 != 0: possible_moves.add(Puzzle.Moves.RIGHT)
-
-			return possible_moves
 
 		def get_possible_next_states(self):  # Returns all the states which can be reached from this particular
 			#  state along with the direction as a dict
 			possible_next_states = {}
 
-			for direction in self.get_possible_moves():
-				possible_next_states[direction] = self._move(direction)
+			if self.zero < 12:
+				possible_next_states[Puzzle.Moves.DOWN] = self._move_down()
+			if self.zero > 3:
+				possible_next_states[Puzzle.Moves.UP] = self._move_up()
+			if self.zero % 4 != 3:
+				possible_next_states[Puzzle.Moves.RIGHT] = self._move_right()
+			if self.zero % 4 != 0:
+				possible_next_states[Puzzle.Moves.LEFT] = self._move_left()
 
 			return possible_next_states
 
@@ -73,29 +69,13 @@ class Puzzle:
 			heuristic_cost = 0
 
 			for masking_table in masking_tables:
-				masked_state_layout = self._mask(masking_table)
-				heuristic_cost += database[masked_state_layout.hex()]
+				masked_state_layout = self.layout.translate(masking_table)      # Mask the current state
+				heuristic_cost += database[masked_state_layout.hex()]           # Values can be ADDED
 
 			return heuristic_cost
 
 
-		def _mask(self,
-		          masking_table):  # Masks the current state and returns the value using a particular masking table
-			return self.layout.translate(masking_table)
-
-		def _move(self, direction):  # Returns the next state possible from the current state given a direction
-			if direction is Puzzle.Moves.UP:
-				return self._move_up()
-			elif direction is Puzzle.Moves.DOWN:
-				return self._move_down()
-			elif direction is Puzzle.Moves.LEFT:
-				return self._move_left()
-			elif direction is Puzzle.Moves.RIGHT:
-				return self._move_right()
-
-			raise TypeError
-
-		def _move_up(self):  # Returns the next state on performing the move 'Up'
+		def _move_down(self):  # Returns the next state on performing the move 'Up'
 			new_layout = self.layout.copy()
 			z = self.zero
 
@@ -103,7 +83,7 @@ class Puzzle:
 
 			return Puzzle.State(new_layout, z + 4)
 
-		def _move_down(self):  # Returns the next state on performing the move 'Down'
+		def _move_up(self):  # Returns the next state on performing the move 'Down'
 			new_layout = self.layout.copy()
 			z = self.zero
 
@@ -111,7 +91,7 @@ class Puzzle:
 
 			return Puzzle.State(new_layout, z - 4)
 
-		def _move_left(self):  # Returns the next state on performing the move 'Left'
+		def _move_right(self):  # Returns the next state on performing the move 'Left'
 			new_layout = self.layout.copy()
 			z = self.zero
 
@@ -119,16 +99,13 @@ class Puzzle:
 
 			return Puzzle.State(new_layout, z + 1)
 
-		def _move_right(self):  # Returns the next state on performing the move 'Right'
+		def _move_left(self):  # Returns the next state on performing the move 'Right'
 			new_layout = self.layout.copy()
 			z = self.zero
 
 			new_layout[z - 1], new_layout[z] = new_layout[z], new_layout[z - 1]
 
 			return Puzzle.State(new_layout, z - 1)
-
-		def _find_zero(self):  # Returns the location of the blank space of the current state
-			return self.layout.find(b'0')
 
 
 	def __init__(self, problem, goal_state):  # Initialize the puzzle with the start state and goal state
@@ -138,24 +115,20 @@ class Puzzle:
 
 		self._database = {}  # dict used for storing the pattern databases
 		self._masking_tables = [  # masking tables corresponding to the pattern databases
-			b''.maketrans(b'056789ABCDEF', b'************'),
-			b''.maketrans(b'012349ABCDEF', b'************'),
-			b''.maketrans(b'012345678DEF', b'************'),
-			b''.maketrans(b'0123456789ABC', b'*************'),
+			b''.maketrans(b'045689ABCDEF', b'************'),        # 01234567890ABCDEF -> *123***7********
+			b''.maketrans(b'01235679ABEF', b'************'),        # 01234567890ABCDEF -> ****4***8***CD**
+			b''.maketrans(b'0123478BCDEF', b'************'),        # 01234567890ABCDEF -> *****56**9A*****
+			b''.maketrans(b'0123456789ACD', b'*************'),      # 01234567890ABCDEF -> ***********B**EF
 		]
 
-		self._pattern_database_keys = [  # The combinations of tiles and number of elements related to
-			(b'1234', 43680),  # each pattern database
-			(b'5678', 43680),  # Four additive disjoint pattern databases have been used
-			(b'9ABC', 43680),  # amounting to a total of 403200 bytes
-			(b'DEF', 3360),  # Databases chosen such that they can be accommodated within
+		self._pattern_database_keys = [                 # The combinations of tiles and number of elements related to
+			(bytearray(b'7321************'), 43680),    #  each pattern database
+			(bytearray(b'DC84************'), 43680),    # Four additive disjoint pattern databases have been used
+			(bytearray(b'A965************'), 43680),    #  amounting to a total of 134400 bytes
+			(bytearray(b'FEB*************'), 3360),     # Databases chosen such that they can be accommodated within
 		]  # supplementary file size limitations
 
-	def solve(self):  # Function to solve the puzzle
-		return self._a_star()
-
-
-	def _a_star(self):  # Perform A* search with pattern databases heuristics
+	def solve(self):  # Function to solve the puzzle. Perform A* search with pattern databases heuristics
 		nodes_generated = 0
 		min_path = Puzzle.Path()
 
@@ -183,8 +156,7 @@ class Puzzle:
 			if cur_state in explored:  # Ignore node if it has already been visited
 				continue
 
-			# Uncomment following line for debugging purposes
-			#   prints "f(n)    g(n)    h(n)    Path_compact"
+			# Uncomment following line for debugging purposes: prints "f(n)    g(n)    h(n)    Path_compact"
 			# print(cur_estimated_cost, cur_estimated_cost - cur_heuristic_cost, cur_heuristic_cost, ''.join([a[0] for a in cur_path]))
 
 			# Exit loop if solution is found
@@ -228,41 +200,56 @@ class Puzzle:
 		"""
 			Read the supplementary file and save it in the _databases variable
 			Format of supplementary file:
-				For each combination (for eg 1234), the locations are stored in 2 bytes using 4 bits each (Uses
-				1.5 bytes for the DEF combination. Most significant nibble is kept 0H)
-				The cost takes up another additional byte.
-				Therefore each entry in the database uses up 3 bytes
-
-				For eg. for the database element ***4***13*****2*  with cost = 22 is stored like this:
-					0111 1110 1000 0011 00010110
-					i.e. (position of 1 in 4 bits) (position of 2 in 4 bits) (position of 3 in 4 bits)
-						 (position of 4 in 4 bits) (cost of particular state in 8 bits)
+				Each byte corresponds to the cost of a partidular pattern.
+				The costs are stored in lexicographical order of the states
+				i.e. (heuristic cost related to ************1237)(heuristic cost related to ************1273)
+					(heuristic cost related to ************1327) and so on...
+				Order of patterns is 1237, 48CD, 569A, BEF
 
 			Space required:
-				For combinations 1234, 5678 and 9ABC each:  3 bytes * (16! / 12!) entries = 131040 bytes
-				For combination DEF:                        3 bytes + (16! / 13!) entries = 10080 bytes
-				Therefore total space required: 3 * 131040 + 10080 = 403200 bytes ~ 394KB
+				For combinations 1237, 48CD and 569A each:  1 bytes * (16! / 12!) entries = 40320 bytes
+				For combination BEF:                        1 bytes + (16! / 13!) entries = 3360 bytes
+				Therefore total space required: 3 * 40320 + 3360 = 134400 bytes ~ 132KB
 		"""
+
+		def next_permutation(cur):  # Function to generate next permutation of state in lexicographical order
+			i = len(cur) - 1
+			while i > 0:
+				if cur[i] <= cur[i - 1]:
+					i -= 1
+				else:
+					break
+			i -= 1
+
+			if i == -1: return cur[::-1]
+
+			j = len(cur) - 1
+			while j >= i:
+				if cur[j] > cur[i]:
+					break
+				else:
+					j -= 1
+
+			cur[i], cur[j] = cur[j], cur[i]
+
+			x, y = i + 1, i - len(cur)
+			cur[x:] = cur[:y:-1]
+
+			return cur
 
 		with open(r'2017B3A70285G_ARJUN.dat', 'rb') as hf:
 			data = hf.read()
 
 		start_size = 0
 		for pattern_database_key, size in self._pattern_database_keys:
+			key = pattern_database_key
 			for j in range(0, size):
-				data_loc = start_size + 3 * j
-				blocks_locs = int.from_bytes(data[data_loc: data_loc + 2], byteorder='big', signed=False)
-				cost = data[data_loc + 2]
-
-				key = bytearray(b'****************')
-				for block in pattern_database_key[::-1]:
-					block_loc = blocks_locs & 15
-					blocks_locs >>= 4
-					key[block_loc] = block
+				key = next_permutation(key)
+				cost = data[start_size + j]
 
 				self._database[key.hex()] = cost
 
-			start_size += size * 3
+			start_size += size
 
 
 def FindMinimumPath(initialState, goalState):
@@ -275,12 +262,10 @@ def FindMinimumPath(initialState, goalState):
 	return minPath, nodesGenerated
 
 
-### TODO: !!!!!!!!!!!!!! CHECK BEFORE SUBMISSION !!!!!!!!!!!!!!
 # **************   DO NOT CHANGE ANY CODE BELOW THIS LINE *****************************
 
 
 def ReadInitialState():
-	# TODO: CHANGE BEFORE SUBMISSION
 	with open("initial_state4.txt", "r") as file:  # IMP: If you change the file name, then there will be an error when
 		#               evaluators test your program. You will lose 2 marks.
 		initialState = [[x for x in line.split()] for i, line in enumerate(file) if i < 4]
